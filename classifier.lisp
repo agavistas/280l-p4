@@ -1,7 +1,7 @@
 (load "read-csv.lisp")
 (use-package :read-csv)
 
-(defun make-classifier (data &optional verbose)
+(defun make-predictor (data &optional verbose)
   (progn
     (let ((posts 0) (categories nil) (wordsinpost nil) (wordsincat nil))
       (if verbose (format t "training data:~%"))
@@ -75,7 +75,7 @@
 
 (let*
     ((trainfile (with-open-file (s (second *posix-argv*)) (read-csv:parse-csv s)))
-     (predictor (make-classifier (cdr trainfile) (= 2 (length *posix-argv*)))))
+     (predictor (make-predictor (cdr trainfile) (= 2 (length *posix-argv*)))))
   (if (= 3 (length *posix-argv*))
       (let ((testfile (with-open-file (s (third *posix-argv*)) (read-csv:parse-csv s))))
 	(dolist (post (cdr testfile))
