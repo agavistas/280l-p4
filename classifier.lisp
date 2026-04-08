@@ -3,7 +3,7 @@
 
 (defun make-classifier (data &optional verbose)
   (progn
-    (let ((posts 0) (categories nil) (words nil))
+    (let ((posts 0) (categories nil) (wordsinpost nil) (wordsincat nil))
       (if verbose (format t "training data:~%"))
       (dolist (post data)
 	(progn
@@ -13,14 +13,55 @@
 	  (let ((pair (assoc (third post) categories :test #'string=)))
 	    (if (not pair) (push (cons (third post) 1) categories)
 		(incf (cdr pair))))
-
-	  (dolist (word (sb-unicode:words (fourth post)))
-	    (tagbody start
-	     (if (string= word " ") (go end)
-		 (print word))
+	  
+	  (let ((uwords nil))
+	    (dolist (word (sb-unicode:words (fourth post)))
+	      (tagbody start
+		 (if (string= word " ") (go end))
+		 (if (member word uwords :test #'string=) (go end))
+		 (push word uwords)
+		 (let ((catwordpair (assoc (list (third post) word) wordsincat :test
+					   (lambda (x y) (and (string= (first x) (first y))
+							      (string= (second x) (second y))))))
+		       (wordpair (assoc word wordsinpost :test #'string=)))
+		   (if (not catwordpair) (push (cons (list (third post) word) 1) wordsincat)
+		       (incf (cdr catwordpair)))
+		   (if (not wordpair) (push (cons word 1) wordsinpost)
+		       (incf (cdr wordpair))))
 	       end))
-	  ))
-      (format t "trained on ~a posts" posts) ;; add post count
+	    ))
+	)
+      (format t "trained on ~a posts~%" posts) ;; add post count
+      (if verbose (format t "vocabulary size = ~a~%" (length wordsinpost)))
+      (format t "~%")
+      (if verbose
+	  (progn
+	    (format t "classes:~%")
+	    (dolist (category categories)
+	      (format t "  ~a, ~a examples, log-prior = ~3$~%"
+		      (car category) (cdr category) (log (/ (cdr category) posts))))
+	    (format t "classifier parameters:~%")
+	    (dolist (catword wordsincat)
+	      (format t "  ~a:~a, count = ~a, log-likelihood = ~3$~%"
+		      (first (car catword)) (second (car catword)) (cdr catword)
+		      (log (/ (cdr catword) (cdr (assoc (first (car catword)) categories
+							:test #'string=))))))
+	    ))
+      (lambda (category post)
+	(let* ((ncategories (cdr (assoc category categories :test #'string=)))
+	       (probability (log (/ (cdr ncategories posts)))))
+	  (dolist (word (sb-unicode:words post))
+	    (tagbody start
+	       (if (string= word " ") (go end))
+	       (incf probability
+		     (let ((nposts (assoc (list category word) wordsincat :test
+					  (lambda (x y) (and (string= (first x) (first y))
+							     (string= (second x) (second y)))))))
+		       (if (not nposts)
+			   (let ((wordn (assoc word wordsinpost :test #'string=)))
+			     (if (not wordn) (log (/ 1 posts)) (log (/ (cdr wordn) posts))))
+			   (log (/ (cdr nposts) ncategories)))))
+	       end))))
       )
     )
   )
@@ -31,9 +72,10 @@
      ;; (exit :code 1)
      ))
 
-(let
+(let*
     ((trainfile (with-open-file (s (second *posix-argv*))
-		  (read-csv:parse-csv s))))
-  (make-classifier (cdr trainfile) (= 2 (length *posix-argv*))))
+		  (read-csv:parse-csv s)))
+     (catchance (make-classifier (cdr trainfile) (= 2 (length *posix-argv*)))))
+  (print catchance))
   
 
