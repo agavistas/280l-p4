@@ -49,7 +49,7 @@
 	    ))
       (lambda (category post)
 	(let* ((ncategories (cdr (assoc category categories :test #'string=)))
-	       (probability (log (/ (cdr ncategories posts)))))
+	       (probability (log (/ ncategories posts))))
 	  (dolist (word (sb-unicode:words post))
 	    (tagbody start
 	       (if (string= word " ") (go end))
@@ -61,21 +61,22 @@
 			   (let ((wordn (assoc word wordsinpost :test #'string=)))
 			     (if (not wordn) (log (/ 1 posts)) (log (/ (cdr wordn) posts))))
 			   (log (/ (cdr nposts) ncategories)))))
-	       end))))
+	     end))
+	  probability
+	  ))
       )
     )
   )
-
 (if (or (> 2 (length *posix-argv*)) (< 3 (length *posix-argv*)))
     (progn
-     (format t "Usage: classifier.exe TRAIN_FILE [TEST_FILE]~%")
-     ;; (exit :code 1)
-     ))
+      (format t "Usage: classifier.exe TRAIN_FILE [TEST_FILE]~%")
+      ;; (exit :code 1)
+      ))
 
 (let*
-    ((trainfile (with-open-file (s (second *posix-argv*))
-		  (read-csv:parse-csv s)))
-     (catchance (make-classifier (cdr trainfile) (= 2 (length *posix-argv*)))))
-  (print catchance))
-  
-
+    ((trainfile (with-open-file (s (second *posix-argv*)) (read-csv:parse-csv s)))
+     (predictor (make-classifier (cdr trainfile) (= 2 (length *posix-argv*)))))
+  (if (= 3 (length *posix-argv*))
+      (let ((testfile (with-open-file (s (third *posix-argv*)) (read-csv:parse-csv s))))
+	(dolist (post (cdr testfile))
+(print (funcall predictor "euchre" (fourth post))))))
