@@ -47,26 +47,30 @@
 		      (log (/ (cdr catword) (cdr (assoc (first (car catword)) categories
 							:test #'string=))))))
 	    ))
-      (lambda (category post)
-	(let* ((ncategories (cdr (assoc category categories :test #'string=)))
-	       (probability (log (/ ncategories posts))))
-	  (dolist (word (sb-unicode:words post))
-	    (tagbody start
-	       (if (string= word " ") (go end))
-	       (incf probability
-		     (let ((nposts (assoc (list category word) wordsincat :test
-					  (lambda (x y) (and (string= (first x) (first y))
-							     (string= (second x) (second y)))))))
-		       (if (not nposts)
-			   (let ((wordn (assoc word wordsinpost :test #'string=)))
-			     (if (not wordn) (log (/ 1 posts)) (log (/ (cdr wordn) posts))))
-			   (log (/ (cdr nposts) ncategories)))))
-	     end))
-	  probability
-	  ))
+      (lambda (post)
+	(let ((probabilities nil))
+	  (progn
+	    (dolist (category categories)
+	      (let* ((probability (log (/ (cdr category) posts))))
+		(dolist (word (sb-unicode:words post))
+		  (tagbody start
+		     (if (string= word " ") (go end))
+		     (incf probability
+			   (let ((nposts (assoc (list (car category) word) wordsincat :test
+						(lambda (x y) (and (string= (first x) (first y))
+								   (string= (second x) (second y)))))))
+			     (if (not nposts)
+				 (let ((wordn (assoc word wordsinpost :test #'string=)))
+				   (if (not wordn) (log (/ 1 posts)) (log (/ (cdr wordn) posts))))
+				 (log (/ (cdr nposts) (cdr category))))))
+		   end))
+		(push (list (car category) probability) probabilities))
+		)
+	    (reduce (lambda (x y) (if (< (second x) (second y)) x y)) probabilities))
+	  )))
       )
     )
-  )
+
 (if (or (> 2 (length *posix-argv*)) (< 3 (length *posix-argv*)))
     (progn
       (format t "Usage: classifier.exe TRAIN_FILE [TEST_FILE]~%")
@@ -77,6 +81,18 @@
     ((trainfile (with-open-file (s (second *posix-argv*)) (read-csv:parse-csv s)))
      (predictor (make-predictor (cdr trainfile) (= 2 (length *posix-argv*)))))
   (if (= 3 (length *posix-argv*))
-      (let ((testfile (with-open-file (s (third *posix-argv*)) (read-csv:parse-csv s))))
+      (let ((testfile (with-open-file (s (third *posix-argv*)) (read-csv:parse-csv s)))
+	    (correct 0))
+	(format t "test data:~%")
 	(dolist (post (cdr testfile))
-(print (funcall predictor "euchre" (fourth post))))))
+	  (let ((result (funcall predictor (fourth post))))
+	    (format t "  correct = ~a, predicted = ~a, log-probability score = ~3$~%  content = ~a~%~%"
+		    (third post)
+		    (first result)
+		    (second result)
+		    (fourth post))
+	    (if (string= (third post) (first result)) (incf correct))))
+	(format t "performance: ~a / ~a posts printed correctly~%"
+		correct
+		(length (cdr testfile)))
+	)))
