@@ -31,7 +31,7 @@
 	       end))
 	    ))
 	)
-      (format t "trained on ~a posts~%" posts) ;; add post count
+      (format t "trained on ~a examples~%" posts) ;; add post count
       (if verbose (format t "vocabulary size = ~a~%" (length wordsinpost)))
       (format t "~%")
       (if verbose
@@ -74,7 +74,7 @@
 (if (or (> 2 (length *posix-argv*)) (< 3 (length *posix-argv*)))
     (progn
       (format t "Usage: classifier.exe TRAIN_FILE [TEST_FILE]~%")
-      ;; (exit :code 1)
+      (exit :code 1)
       ))
 
 (let*
